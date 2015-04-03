@@ -45,12 +45,22 @@ def _get_available_letters(field_name, queryset):
 
     Returns a set that represents the letters that exist in the database.
     """
-    def upper_first_letter(element):
-        object_fields = [field.attname for field in element._meta.fields]
-        for field in ALPHABET_FILTER_BY_FIELD:
-            if field in object_fields:
-                word = getattr(element, field)
-                return word[0].upper()
+    def upper_first_letter(field_name, element):
+
+        def filter_func(element):
+            if hasattr(element, field_name):
+                return getattr(element, field_name)
+            else:
+                set_fields = set(element.__dict__.keys())
+                intersection_name = list(set_fields.intersection(ALPHABET_FILTER_BY_FIELD))
+                return getattr(element, intersection_name[0]) if intersection_name else \
+                    element.pk
+
+        word = filter_func(element)
+        if word and isinstance(word, basestring):
+            return word[0].upper()
+        elif word and isinstance(word, int):
+            return unicode(word)[0]
 
     if django.VERSION[1] <= 4:
         result = queryset.values(field_name).annotate(
@@ -58,7 +68,7 @@ def _get_available_letters(field_name, queryset):
         ).values('fl').distinct()
         return set([res['fl'] for res in result if res['fl'] is not None])
     else:
-        return set([upper_first_letter(row)
+        return set([upper_first_letter(field_name, row)
                    for row in queryset
                    if row is not None])
 
