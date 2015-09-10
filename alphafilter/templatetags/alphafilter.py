@@ -6,7 +6,7 @@ from django.template import (Library, Node, Variable, VariableDoesNotExist,
 from django.template.loader import get_template
 
 from alphafilter.sql import FirstLetter
-
+from django.db import models
 register = Library()
 
 from django.conf import settings
@@ -84,8 +84,19 @@ def alphabet(cl):
     alpha_field = '%s__istartswith' % field_name
     alpha_lookup = cl.params.get(alpha_field, '')
     link = lambda d: cl.get_query_string(d)
-
-    letters_used = _get_available_letters(field_name, cl.model.objects.all())
+    
+    qs = cl.model.objects.all()
+    
+    ########## filter out soft-deleted objects
+    try: 
+      cl.model._meta.get_field_by_name('is_deleted') 
+    except models.FieldDoesNotExist:
+      pass
+    else:
+      qs = qs.filter(is_deleted=False)
+    ###########################################  
+    
+    letters_used = _get_available_letters(field_name, qs)
     all_letters = list(_get_default_letters(cl.model_admin) | letters_used)
     all_letters.sort()
 
